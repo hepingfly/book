@@ -1,0 +1,11 @@
+# EPUB extraction temporary files
+epub_extracted/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# System files
+.DS_Store
+Thumbs.db
