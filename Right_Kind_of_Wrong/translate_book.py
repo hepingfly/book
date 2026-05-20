@@ -258,44 +258,50 @@ def update_opf(work_dir: Path, translated_dir: Path):
 
 
 def build_epub(work_dir: Path, translated_dir: Path, output_path: Path):
-    """Repack the epub substituting translated files where available."""
+    """Repack the epub substituting translated files where available.
+
+    Reads every entry from the original epub to preserve the complete structure
+    (including META-INF/container.xml), then substitutes translated xhtml files
+    and updated toc.ncx / OPF metadata where available.
+    """
     print("\nBuilding epub...")
     if output_path.exists():
         output_path.unlink()
 
-    xhtml_base = work_dir / "e9781982195083" / "xhtml"
     translated_xhtml_dir = translated_dir / "xhtml"
 
-    with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        # mimetype must be first and uncompressed
-        mimetype = work_dir / "mimetype"
-        if mimetype.exists():
-            zf.write(mimetype, "mimetype", compress_type=zipfile.ZIP_STORED)
+    with zipfile.ZipFile(EPUB_SRC, "r") as src_zf, \
+         zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as dst_zf:
 
-        for fpath in sorted(work_dir.rglob("*")):
-            if fpath.is_dir():
+        # mimetype must be first entry and stored uncompressed
+        dst_zf.writestr(
+            zipfile.ZipInfo("mimetype"),
+            src_zf.read("mimetype"),
+            compress_type=zipfile.ZIP_STORED,
+        )
+
+        for name in src_zf.namelist():
+            if name == "mimetype":
                 continue
-            rel = str(fpath.relative_to(work_dir))
-            if rel == "mimetype":
-                continue
 
-            fname = fpath.name
-            src = fpath  # default: use original
+            fname = name.split("/")[-1]
 
-            if fpath.parent == xhtml_base and fname in TRANSLATE_FILES:
+            if name.startswith("e9781982195083/xhtml/") and fname in TRANSLATE_FILES:
                 candidate = translated_xhtml_dir / fname
                 if candidate.exists():
-                    src = candidate
+                    data = candidate.read_bytes()
+                else:
+                    data = src_zf.read(name)
             elif fname == "toc.ncx":
                 candidate = translated_dir / "toc.ncx"
-                if candidate.exists():
-                    src = candidate
-            elif fpath.suffix == ".opf":
+                data = candidate.read_bytes() if candidate.exists() else src_zf.read(name)
+            elif name.endswith(".opf"):
                 candidate = translated_dir / fname
-                if candidate.exists():
-                    src = candidate
+                data = candidate.read_bytes() if candidate.exists() else src_zf.read(name)
+            else:
+                data = src_zf.read(name)
 
-            zf.write(src, rel)
+            dst_zf.writestr(name, data)
 
     print(f"Epub built: {output_path}")
     size_mb = output_path.stat().st_size / 1024 / 1024
