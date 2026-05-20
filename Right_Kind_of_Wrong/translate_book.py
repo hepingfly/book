@@ -44,6 +44,7 @@ TRANSLATE_FILES = [
     "copyright.xhtml",
     "SS_US_adult_signup_front.xhtml",
     "SS_US_adult_signup_back.xhtml",
+    "nav.xhtml",
 ]
 
 CHAPTER_TITLES_CN = {
